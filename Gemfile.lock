@@ -1,10 +1,8 @@
 GIT
-  remote: https://github.com/kivanio/brcobranca.git 
-  revision: 8503d474b98f793244a620cb12fb30010398f072 
+  remote: https://github.com/kivanio/brcobranca.git
+  revision: 3aed3d6251c963c2208fb1304ef3beefe4cba6b4
   specs:
-    brcobranca (8.0.0)
-      activemodel (>= 3)
-      activesupport (>= 3)
+    brcobranca (9.2.2)
       parseline (~> 1.0.3)
       rghost (~> 0.9)
       rghost_barcode (~> 0.9)
@@ -13,8 +11,6 @@ GIT
 GEM
   remote: https://rubygems.org/
   specs:
-    activemodel (5.1.1)
-      activesupport (= 5.1.1)
     activesupport (5.1.1)
       concurrent-ruby (~> 1.0, >= 1.0.2)
       i18n (~> 0.7)
@@ -76,4 +72,4 @@ DEPENDENCIES
   puma
 
 BUNDLED WITH
-   1.11.2
+   1.16.3

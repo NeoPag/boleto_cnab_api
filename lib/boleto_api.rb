@@ -23,9 +23,13 @@ module BoletoApi
   end
 
   class Server < Grape::API
-    version 'v1', using: :header, vendor: 'Akretion'
+    version 'v1', using: :header, vendor: 'Neopag'
     format :json
     prefix :api
+
+    # rescue_from :all do |e|
+    #   error!("Internal Server Error", 500)
+    # end
 
     resource :boleto do
 
@@ -35,10 +39,10 @@ module BoletoApi
       # boleto fields are listed here: https://github.com/kivanio/brcobranca/blob/master/lib/brcobranca/boleto/base.rb
       params do
         requires :bank, type: String, desc: 'Bank'
-        requires :data, type: String, desc: 'Boleto data as a stringified json'
+        requires :data, type: Hash, desc: 'Boleto data as a stringified json'
       end
-      get :validate do
-        values = JSON.parse(params[:data])
+      post :validate do
+        values = params[:data]
         boleto = BoletoApi.get_boleto(params[:bank], values)
         if boleto.valid?
           true
@@ -54,11 +58,10 @@ module BoletoApi
       # boleto fields are listed here: https://github.com/kivanio/brcobranca/blob/master/lib/brcobranca/boleto/base.rb
       params do
         requires :bank, type: String, desc: 'Bank'
-        requires :data, type: String, desc: 'Boleto data as a stringified json'
+        requires :data, type: Hash, desc: 'Boleto data as a stringified json'
       end
-      get :nosso_numero do
-        values = JSON.parse(params[:data])
-        boleto = BoletoApi.get_boleto(params[:bank], values)
+      post :nosso_numero do
+        boleto = BoletoApi.get_boleto(params[:bank], params[:data])
         if boleto.valid?
           boleto.nosso_numero_boleto
         else
@@ -73,11 +76,10 @@ module BoletoApi
       params do
         requires :bank, type: String, desc: 'Bank'
         requires :type, type: String, desc: 'Type: pdf|jpg|png|tif'
-        requires :data, type: String, desc: 'Boleto data as a stringified json'
+        requires :data, type: Hash, desc: 'Boleto data as a stringified json'
       end
-      get do
-        values = JSON.parse(params[:data])
-        boleto = BoletoApi.get_boleto(params[:bank], values)
+      post do
+        boleto = BoletoApi.get_boleto(params[:bank], params[:data])
         if boleto.valid?
           content_type "application/#{params[:type]}"
           header['Content-Disposition'] = "attachment; filename=boleto-#{params[:bank]}.#{params[:type]}"
@@ -133,13 +135,12 @@ module BoletoApi
       params do
         requires :bank, type: String, desc: 'Bank'
         requires :type, type: String, desc: 'Type: cnab400|cnab240'
-        requires :data, type: File, desc: 'json of the list of pagamentos'
+        requires :data, type: Hash, desc: 'json of the list of pagamentos'
       end
       post do
-        values = JSON.parse(params[:data][:tempfile].read())
         pagamentos = []
-      	errors = []
-        values['pagamentos'].each do |pagamento_values|
+        errors = []
+        params[:data][:pagamentos].each do |pagamento_values|
           pagamento = BoletoApi.get_pagamento(pagamento_values)
           if pagamento.valid?
             pagamentos << pagamento
@@ -148,12 +149,12 @@ module BoletoApi
           end
         end
         if errors.empty?
-          values[:pagamentos] = pagamentos
+          params[:data][:pagamentos] = pagamentos
           clazz = Object.const_get("Brcobranca::Remessa::#{params[:type].camelize}::#{params[:bank].camelize}")
-          remessa = clazz.new(values)
+          remessa = clazz.new(params[:data])
           if remessa.valid?
             env['api.format'] = :binary
-            remessa.gera_arquivo()
+            {arquivo: remessa.gera_arquivo()}
           else
             [remessa.errors.messages] + errors
           end
@@ -163,8 +164,6 @@ module BoletoApi
       end
     end
 
-    # to avoid returning Ruby objects, we will read the payments fields from https://github.com/kivanio/brcobranca/blob/master/lib/brcobranca/retorno/base.rb
-    RETORNO_FIELDS = [:codigo_registro,:codigo_ocorrencia,:data_ocorrencia,:agencia_com_dv,:agencia_sem_dv,:cedente_com_dv,:convenio,:nosso_numero,:codigo_ocorrencia,:data_ocorrencia,:tipo_cobranca,:tipo_cobranca_anterior,:natureza_recebimento,:carteira_variacao,:desconto,:iof,:carteira,:comando,:data_liquidacao,:data_vencimento,:valor_titulo,:banco_recebedor,:agencia_recebedora_com_dv,:especie_documento,:data_ocorrencia,:data_credito,:valor_tarifa,:outras_despesas,:juros_desconto,:iof_desconto,:valor_abatimento,:desconto_concedito,:valor_recebido,:juros_mora,:outros_recebimento,:abatimento_nao_aproveitado,:valor_lancamento,:indicativo_lancamento,:indicador_valor,:valor_ajuste,:sequencial,:arquivo,:outros_recebimento,:motivo_ocorrencia,:documento_numero]
     resource :retorno do
       # example:
       # wget -O /tmp/CNAB400ITAU.RET https://raw.githubusercontent.com/kivanio/brcobranca/master/spec/arquivos/CNAB400ITAU.RET
@@ -180,9 +179,9 @@ module BoletoApi
         clazz = Object.const_get("Brcobranca::Retorno::#{params[:type].camelize}::#{params[:bank].camelize}")
         pagamentos = clazz.load_lines(data)
         pagamentos.map! do |p|
-          Hash[RETORNO_FIELDS.map{|sym| [sym, p.send(sym)]}]
+          p.instance_variables.each_with_object({}) { |var, hash| hash[var.to_s.delete("@")] = p.instance_variable_get(var) }
         end
-        JSON.generate(pagamentos)
+        pagamentos
       end
     end
   end

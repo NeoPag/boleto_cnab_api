@@ -1,6 +1,5 @@
 FROM akretion/voodoo-ruby:latest
 
-LABEL maintainer "raphael.valyi@akretion.com"
 
 USER root
 
