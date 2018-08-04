@@ -84,7 +84,12 @@ module BoletoApi
           content_type "application/#{params[:type]}"
           header['Content-Disposition'] = "attachment; filename=boleto-#{params[:bank]}.#{params[:type]}"
           env['api.format'] = :binary
-          boleto.send("to_#{params[:type]}".to_sym)
+          boleto_json = boleto.instance_variables.each_with_object({}) { |var, hash| hash[var.to_s.delete("@")] = boleto.instance_variable_get(var) }
+          if params[:type] == "json"
+            boleto_json
+          else
+            boleto.send("to_#{params[:type]}".to_sym)
+          end
         else
           error!(boleto.errors.messages, 400)
         end
@@ -154,7 +159,7 @@ module BoletoApi
           remessa = clazz.new(params[:data])
           if remessa.valid?
             env['api.format'] = :binary
-            {arquivo: remessa.gera_arquivo()}
+            remessa.gera_arquivo()
           else
             [remessa.errors.messages] + errors
           end
@@ -167,7 +172,7 @@ module BoletoApi
     resource :retorno do
       # example:
       # wget -O /tmp/CNAB400ITAU.RET https://raw.githubusercontent.com/kivanio/brcobranca/master/spec/arquivos/CNAB400ITAU.RET
-      # curl -X POST -F type=cnab400 -F bank=itau -F 'data=@/tmp/CNAB400ITAU.RET.txt' localhost:9292/api/retorno
+      # curl -X POST -F type=cnab400 -F bank=itau -F 'data=@/tmp/CNAB400ITAU.RET' localhost:9292/api/retorno
       # the returned payment items have these fields: https://github.com/kivanio/brcobranca/blob/master/lib/brcobranca/retorno/base.rb
       params do
         requires :bank, type: String, desc: 'Bank'
