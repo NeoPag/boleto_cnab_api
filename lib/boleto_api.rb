@@ -86,6 +86,7 @@ module BoletoApi
           env['api.format'] = :binary
           boleto_json = boleto.instance_variables.each_with_object({}) { |var, hash| hash[var.to_s.delete("@")] = boleto.instance_variable_get(var) }
           if params[:type] == "json"
+            boleto_json[:codigo_barras] = boleto.codigo_barras.linha_digitavel
             boleto_json
           else
             boleto.send("to_#{params[:type]}".to_sym)
